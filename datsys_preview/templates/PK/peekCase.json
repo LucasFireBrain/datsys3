@@ -1,0 +1,17 @@
+{
+  "id_caso": "",
+  "nombre_paciente": "",
+  "nombre_doctor": "",
+  "hospital_clinica": "",
+  "fecha_cirugia": "",
+  "hora_cirugia": "",
+  "region": "",
+  "especificaciones": "",
+  "requiere_material_adicional": "",
+  "precio_clp": 0,
+  "iva_incluido": true,
+  "fecha_entrega_estimada": "",
+  "estado_caso": "",
+  "notas": "",
+  "link_dicom": ""
+}
