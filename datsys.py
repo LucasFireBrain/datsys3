@@ -1,4 +1,7 @@
 import os
+from dicom_ingestion import ingest_dicom
+from peek import init_peek_case, prompt_peek_case
+from slicer_launcher import launch_slicer_with_dicom
 from utils import (
     CLIENTS_DIR,
     ensure_dir,
@@ -53,6 +56,8 @@ def project_menu(client_id, project_id, project_path):
         print("[1] Open project folder")
         print("[2] Open LOG.txt")
         print("[3] PEEK Case Info")
+        print("[4] Ingest DICOM")
+        print("[5] Open in 3D Slicer")
         print("[B] Back")
 
         choice = prompt("> ").lower()
@@ -68,9 +73,32 @@ def project_menu(client_id, project_id, project_path):
             os.startfile(log_path)
 
         elif choice == "3":
-            print("(PEEK workflow not wired yet)")
+            try:
+                prompt_peek_case(project_path)
+            except Exception as e:
+                print(f"[ERROR] {e}")
+
+
+        elif choice == "4":
+            try:
+                ingest_dicom(project_path)
+            except Exception as e:
+                print(f"[ERROR] {e}")
+
+        elif choice == "5":
+            dicom_path = os.path.join(project_path, "DICOM")
+
+            if not os.path.isdir(dicom_path):
+                print("[ERROR] DICOM folder not found. Ingest DICOM first.")
+                continue
+
+            try:
+                launch_slicer_with_dicom(dicom_path)
+            except Exception as e:
+                print(f"[ERROR] {e}")
 
         elif choice == "b":
+
             return
 
 # --------------------------------------------------
@@ -118,19 +146,12 @@ def new_project():
 
     project_type = type_map[t]
 
-    # suffix = count of existing projects
-    # existing = list_dirs(client_dir)  # if want to use dir-based instead of json
-    # suffix = len(existing) + 1
-    client_json_path = os.path.join(client_dir, f"client_{client_id}.json")
     client = load_json(client_json_path, {})
 
-    # get + increment suffix from client json
+    # increment project count
     suffix = client.get("project_count", 0) + 1
     client["project_count"] = suffix
-
-    # persist immediately
     save_json(client_json_path, client)
-
 
     date_code = date_code_base36()
     project_id = f"{date_code}-{client_id}-{project_type}{suffix}"
@@ -148,6 +169,16 @@ def new_project():
             "created_at": now_iso(),
         },
     )
+
+    # derive doctor name from client json
+    doctor_name = client.get("name", "")
+
+    # --------------------------------------------------
+    # INIT PEEK CASE (PK ONLY)
+    # --------------------------------------------------
+
+    if project_type == "PK":
+        init_peek_case(project_dir, project_id, doctor_name)
 
     print(f"\nProject created: {project_id}")
     project_menu(client_id, project_id, project_dir)
