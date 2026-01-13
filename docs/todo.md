@@ -60,6 +60,7 @@ Status: ❌ Not implemented
   peek_case.json → nombre_paciente
   ```
 - Only if field is empty (never overwrite silently)
+- If there is a difference in values, give warning to user (patient name mismatch)
 
 Status: ❌ Not implemented
 
