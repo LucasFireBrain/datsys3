@@ -5,85 +5,175 @@ from utils import (
     list_dirs,
     load_json,
     save_json,
-    now_iso
+    now_iso,
+    date_code_base36,
 )
 
-from peek.peek import init_peek_case, prompt_peek_case
+# --------------------------------------------------
+# HELPERS
+# --------------------------------------------------
 
-# -------------------------
-# CLIENTS
-# -------------------------
+def prompt(msg):
+    return input(msg).strip()
 
-def get_client(client_id):
-    client_dir = os.path.join(CLIENTS_DIR, client_id)
-    if not os.path.isdir(client_dir):
-        return None, None
+def select_from_list(items, title):
+    if not items:
+        print("Nothing found.")
+        return None
 
-    for f in os.listdir(client_dir):
-        if f.startswith("client_") and f.endswith(".json"):
-            return load_json(os.path.join(client_dir, f)), client_dir
+    print(f"\n--- {title} ---")
+    for i, item in enumerate(items, 1):
+        print(f"[{i}] {item}")
+    print("[B] Back")
 
-    return None, client_dir
+    choice = prompt("> ").lower()
+    if choice == "b":
+        return None
 
-def create_client(client_id):
-    client_dir = os.path.join(CLIENTS_DIR, client_id)
-    ensure_dir(client_dir)
+    if not choice.isdigit():
+        return None
 
-    name = input("Client name: ").strip()
-    contact = input("Contact info: ").strip()
+    idx = int(choice) - 1
+    if idx < 0 or idx >= len(items):
+        return None
 
-    data = {
-        "id": client_id,
-        "name": name,
-        "contact": contact,
-        "project_count": 0,
-        "created_at": now_iso()
-    }
+    return items[idx]
 
-    path = os.path.join(client_dir, f"client_{client_id}.json")
-    save_json(path, data)
-    return data, client_dir
+# --------------------------------------------------
+# PROJECT MENU
+# --------------------------------------------------
 
-# -------------------------
-# PROJECTS
-# -------------------------
+def project_menu(client_id, project_id, project_path):
+    while True:
+        print("\n==============================")
+        print(f"Client:  {client_id}")
+        print(f"Project: {project_id}")
+        print("==============================")
 
-def next_project_id(client, client_dir, project_type):
-    client["project_count"] += 1
-    suffix = client["project_count"]
+        print("[1] Open project folder")
+        print("[2] Open LOG.txt")
+        print("[3] PEEK Case Info")
+        print("[B] Back")
 
-    year_code = "Q"  # placeholder, you can refine later
-    pid = f"{year_code}{suffix:02d}-{client['id']}-{project_type}"
+        choice = prompt("> ").lower()
 
-    save_json(
-        os.path.join(client_dir, f"client_{client['id']}.json"),
-        client
-    )
-    return pid
+        if choice == "1":
+            os.startfile(project_path)
 
-def create_project(client, client_dir):
-    print("\nProject type:")
-    print("[1] PK - PEEK")
-    choice = input("> ").strip()
+        elif choice == "2":
+            log_path = os.path.join(project_path, "LOG.txt")
+            if not os.path.exists(log_path):
+                with open(log_path, "w", encoding="utf-8") as f:
+                    f.write("")
+            os.startfile(log_path)
 
-    if choice != "1":
-        print("Only PK supported for now.")
+        elif choice == "3":
+            print("(PEEK workflow not wired yet)")
+
+        elif choice == "b":
+            return
+
+# --------------------------------------------------
+# NEW PROJECT
+# --------------------------------------------------
+
+def new_project():
+    ensure_dir(CLIENTS_DIR)
+
+    client_id = prompt("Enter client ID: ").upper()
+    if not client_id:
         return
 
-    project_type = "PK"
-    pid = next_project_id(client, client_dir, project_type)
+    client_dir = os.path.join(CLIENTS_DIR, client_id)
+    client_json_path = os.path.join(client_dir, f"client_{client_id}.json")
 
-    project_path = os.path.join(client_dir, pid)
-    ensure_dir(project_path)
+    if not os.path.exists(client_dir):
+        print("New client detected.")
+        name = prompt("Client full name: ")
+        contact = prompt("Contact info: ")
 
-    print(f"\nProject created: {pid}")
+        ensure_dir(client_dir)
+        save_json(client_json_path, {
+            "id": client_id,
+            "name": name,
+            "contact": contact,
+            "created_at": now_iso(),
+        })
+    else:
+        client = load_json(client_json_path, {})
+        print(f"Client found: {client.get('name','')} ({client_id})")
+        if prompt("Continue? [y/N]: ").lower() != "y":
+            return
 
-    init_peek_case(project_path, doctor_name=client["name"])
-    prompt_peek_case(project_path)
+    # project type
+    print("\nProject type:")
+    print("[1] PK - PEEK")
+    print("[2] PL - PLA")
+    print("[3] AR - Archive")
 
-# -------------------------
-# CLI
-# -------------------------
+    t = prompt("> ")
+    type_map = {"1": "PK", "2": "PL", "3": "AR"}
+    if t not in type_map:
+        return
+
+    project_type = type_map[t]
+
+    # suffix = count of existing projects
+    # existing = list_dirs(client_dir)  # if want to use dir-based instead of json
+    # suffix = len(existing) + 1
+    client_json_path = os.path.join(client_dir, f"client_{client_id}.json")
+    client = load_json(client_json_path, {})
+
+    # get + increment suffix from client json
+    suffix = client.get("project_count", 0) + 1
+    client["project_count"] = suffix
+
+    # persist immediately
+    save_json(client_json_path, client)
+
+
+    date_code = date_code_base36()
+    project_id = f"{date_code}-{client_id}-{project_type}{suffix}"
+    project_dir = os.path.join(client_dir, project_id)
+
+    ensure_dir(project_dir)
+
+    # minimal project json
+    save_json(
+        os.path.join(project_dir, f"{project_id}.json"),
+        {
+            "id": project_id,
+            "client_id": client_id,
+            "type": project_type,
+            "created_at": now_iso(),
+        },
+    )
+
+    print(f"\nProject created: {project_id}")
+    project_menu(client_id, project_id, project_dir)
+
+# --------------------------------------------------
+# OPEN PROJECT
+# --------------------------------------------------
+
+def open_project():
+    clients = list_dirs(CLIENTS_DIR)
+    client_id = select_from_list(clients, "Select client")
+    if not client_id:
+        return
+
+    client_dir = os.path.join(CLIENTS_DIR, client_id)
+    projects = list_dirs(client_dir)
+    project_id = select_from_list(projects, "Select project")
+    if not project_id:
+        return
+
+    project_dir = os.path.join(client_dir, project_id)
+    project_menu(client_id, project_id, project_dir)
+
+# --------------------------------------------------
+# MAIN
+# --------------------------------------------------
 
 def main():
     ensure_dir(CLIENTS_DIR)
@@ -91,23 +181,16 @@ def main():
     while True:
         print("\n=== DATSYS ===")
         print("[1] New project")
-        print("[2] Exit")
+        print("[2] Open project")
+        print("[3] Exit")
 
-        choice = input("> ").strip()
+        choice = prompt("> ")
 
         if choice == "1":
-            client_id = input("Enter client ID: ").strip().upper()
-            client, client_dir = get_client(client_id)
-
-            if client:
-                print(f"Client found: {client['name']}")
-            else:
-                print("New client.")
-                client, client_dir = create_client(client_id)
-
-            create_project(client, client_dir)
-
+            new_project()
         elif choice == "2":
+            open_project()
+        elif choice == "3":
             break
 
 if __name__ == "__main__":
