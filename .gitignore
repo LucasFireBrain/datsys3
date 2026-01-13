@@ -1,0 +1,45 @@
+# =========================
+# DatSys3 – Git Ignore
+# =========================
+
+# --- Runtime / user data (SOURCE OF TRUTH, NEVER COMMIT) ---
+clients/
+data/
+
+# --- Python artifacts ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- Virtual environments ---
+.venv/
+venv/
+ENV/
+
+# --- OS / Editor noise ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Logs ---
+*.log
+
+# --- Temporary / backups ---
+*.tmp
+*.bak
+*.swp
+*~
+
+# --- IDE configs (optional, keep repo clean) ---
+.vscode/
+.idea/
+
+# --- Archives (DICOM zips etc.) ---
+*.zip
+*.rar
+*.7z
+
+# --- Blender / Slicer autosaves ---
+*.blend1
+*.blend2
