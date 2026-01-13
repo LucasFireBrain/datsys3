@@ -3,7 +3,8 @@
 # =========================
 
 # --- Runtime / user data (SOURCE OF TRUTH, NEVER COMMIT) ---
-clients/
+clients/**
+!clients/.gitkeep
 data/
 
 # --- Python artifacts ---
