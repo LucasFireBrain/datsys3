@@ -17,8 +17,11 @@ from utils import load_json, save_json
 DICOM_DIRNAME = "DICOM"
 LOG_FILENAME = "Log.txt"
 PEEK_CASE_FILENAME = "peekCase.json"
+
 DOWNLOADS_DIR = Path.home() / "Downloads"
-SUPPORTED_EXTS = (".zip", ".7z", ".rar")
+ARCHIVE_EXTS = (".zip", ".7z", ".rar")
+SINGLE_DICOM_EXTS = (".dcm",)
+
 MAX_LIST = 10
 
 
@@ -53,28 +56,32 @@ def contains_dicom(folder: Path) -> bool:
     return False
 
 
-def list_recent_archives():
-    archives = [
-        p for p in DOWNLOADS_DIR.iterdir()
-        if p.is_file() and p.suffix.lower() in SUPPORTED_EXTS
-    ]
-    archives.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    return archives[:MAX_LIST]
+def list_recent_inputs():
+    items = []
+
+    for p in DOWNLOADS_DIR.iterdir():
+        if not p.is_file():
+            continue
+        if p.suffix.lower() in ARCHIVE_EXTS + SINGLE_DICOM_EXTS:
+            items.append(p)
+
+    items.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return items[:MAX_LIST]
 
 
-def select_archive_interactive() -> Path | None:
-    archives = list_recent_archives()
+def select_input_interactive() -> Path | None:
+    items = list_recent_inputs()
 
-    if not archives:
-        print("No zip / 7z / rar files found in Downloads.")
+    if not items:
+        print("No DICOM archives or files found in Downloads.")
         return None
 
-    print("\nRecent archives:")
-    for i, p in enumerate(archives, 1):
+    print("\nRecent inputs:")
+    for i, p in enumerate(items, 1):
         mtime = datetime.fromtimestamp(p.stat().st_mtime)
         print(f"[{i}] {p.name}  ({mtime:%Y-%m-%d %H:%M})")
 
-    print("\nSelect archive [1-{}] or paste full path".format(len(archives)))
+    print("\nSelect [1-{}] or paste full path".format(len(items)))
     print("Press ENTER to cancel")
 
     choice = input("> ").strip()
@@ -83,15 +90,13 @@ def select_archive_interactive() -> Path | None:
 
     if choice.isdigit():
         idx = int(choice) - 1
-        if 0 <= idx < len(archives):
-            return archives[idx]
+        if 0 <= idx < len(items):
+            return items[idx]
         raise RuntimeError("Invalid selection number")
 
     path = Path(choice.strip('"'))
     if not path.exists():
-        raise RuntimeError(f"Archive not found: {path}")
-    if path.suffix.lower() not in SUPPORTED_EXTS:
-        raise RuntimeError("Unsupported archive format")
+        raise RuntimeError(f"Path not found: {path}")
 
     return path
 
@@ -148,24 +153,37 @@ def ingest_dicom(project_path: str):
             return
         shutil.rmtree(dicom_dir)
 
-    archive = select_archive_interactive()
-    if archive is None:
+    dicom_dir.mkdir()
+
+    source = select_input_interactive()
+    if source is None:
         print("Aborted.")
         return
 
-    print(f"\nUsing archive: {archive}")
+    print(f"\nUsing input: {source}")
 
-    dicom_dir.mkdir()
-    extract_archive(archive, dicom_dir)
+    # ---- HANDLE INPUT TYPES ----
+    if source.is_dir():
+        shutil.copytree(source, dicom_dir, dirs_exist_ok=True)
+
+    elif source.suffix.lower() in ARCHIVE_EXTS:
+        extract_archive(source, dicom_dir)
+
+    elif source.suffix.lower() in SINGLE_DICOM_EXTS:
+        shutil.copy2(source, dicom_dir / source.name)
+
+    else:
+        shutil.rmtree(dicom_dir)
+        raise RuntimeError("Unsupported DICOM input")
 
     if not contains_dicom(dicom_dir):
         shutil.rmtree(dicom_dir)
-        raise RuntimeError("Extracted data does not appear to contain DICOM files")
+        raise RuntimeError("Input does not appear to contain DICOM files")
 
     patient_name = extract_patient_name(dicom_dir)
     update_peek_case_patient(project_dir, patient_name)
 
-    append_log(project_dir, f'DICOM ingested from "{archive.name}"')
+    append_log(project_dir, f'DICOM ingested from "{source.name}"')
     print(f"[OK] DICOM ingested into: {dicom_dir}")
 
 

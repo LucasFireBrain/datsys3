@@ -1,7 +1,8 @@
 import os
+import shutil
+from pathlib import Path
+
 from dicom_ingestion import ingest_dicom
-from peek import init_peek_case, prompt_peek_case
-from slicer_launcher import launch_slicer_with_dicom
 from utils import (
     CLIENTS_DIR,
     ensure_dir,
@@ -11,6 +12,14 @@ from utils import (
     now_iso,
     date_code_base36,
 )
+
+# --------------------------------------------------
+# CONFIG
+# --------------------------------------------------
+
+BASE_DIR = Path(__file__).parent
+TEMPLATES_DIR = BASE_DIR / "templates"
+PEEK_TEMPLATE_DIR = TEMPLATES_DIR / "PK"
 
 # --------------------------------------------------
 # HELPERS
@@ -37,10 +46,10 @@ def select_from_list(items, title):
         return None
 
     idx = int(choice) - 1
-    if idx < 0 or idx >= len(items):
-        return None
+    if 0 <= idx < len(items):
+        return items[idx]
 
-    return items[idx]
+    return None
 
 # --------------------------------------------------
 # PROJECT MENU
@@ -58,6 +67,7 @@ def project_menu(client_id, project_id, project_path):
         print("[3] PEEK Case Info")
         print("[4] Ingest DICOM")
         print("[5] Open in 3D Slicer")
+        print("[6] Open in Blender")
         print("[B] Back")
 
         choice = prompt("> ").lower()
@@ -66,39 +76,26 @@ def project_menu(client_id, project_id, project_path):
             os.startfile(project_path)
 
         elif choice == "2":
-            log_path = os.path.join(project_path, "LOG.txt")
-            if not os.path.exists(log_path):
-                with open(log_path, "w", encoding="utf-8") as f:
-                    f.write("")
+            log_path = Path(project_path) / "Log.txt"
+            log_path.touch(exist_ok=True)
             os.startfile(log_path)
 
         elif choice == "3":
-            try:
-                prompt_peek_case(project_path)
-            except Exception as e:
-                print(f"[ERROR] {e}")
-
+            from peek import prompt_peek_case
+            prompt_peek_case(project_path)
 
         elif choice == "4":
-            try:
-                ingest_dicom(project_path)
-            except Exception as e:
-                print(f"[ERROR] {e}")
+            ingest_dicom(project_path)
 
         elif choice == "5":
-            dicom_path = os.path.join(project_path, "DICOM")
-
-            if not os.path.isdir(dicom_path):
-                print("[ERROR] DICOM folder not found. Ingest DICOM first.")
-                continue
-
-            try:
-                launch_slicer_with_dicom(dicom_path)
-            except Exception as e:
-                print(f"[ERROR] {e}")
+            from slicer_launcher import launch_slicer_with_dicom
+            dicom_dir = Path(project_path) / "DICOM"
+            launch_slicer_with_dicom(dicom_dir)
+        elif choice == "6":
+            from blender_launcher import launch_blender
+            launch_blender(project_path, project_id)
 
         elif choice == "b":
-
             return
 
 # --------------------------------------------------
@@ -112,20 +109,21 @@ def new_project():
     if not client_id:
         return
 
-    client_dir = os.path.join(CLIENTS_DIR, client_id)
-    client_json_path = os.path.join(client_dir, f"client_{client_id}.json")
+    client_dir = Path(CLIENTS_DIR) / client_id
+    client_json_path = client_dir / f"client_{client_id}.json"
 
-    if not os.path.exists(client_dir):
+    if not client_dir.exists():
         print("New client detected.")
         name = prompt("Client full name: ")
         contact = prompt("Contact info: ")
 
-        ensure_dir(client_dir)
+        client_dir.mkdir(parents=True)
         save_json(client_json_path, {
             "id": client_id,
             "name": name,
             "contact": contact,
             "created_at": now_iso(),
+            "project_count": 0,
         })
     else:
         client = load_json(client_json_path, {})
@@ -133,7 +131,6 @@ def new_project():
         if prompt("Continue? [y/N]: ").lower() != "y":
             return
 
-    # project type
     print("\nProject type:")
     print("[1] PK - PEEK")
     print("[2] PL - PLA")
@@ -147,21 +144,35 @@ def new_project():
     project_type = type_map[t]
 
     client = load_json(client_json_path, {})
-
-    # increment project count
     suffix = client.get("project_count", 0) + 1
     client["project_count"] = suffix
     save_json(client_json_path, client)
 
     date_code = date_code_base36()
     project_id = f"{date_code}-{client_id}-{project_type}{suffix}"
-    project_dir = os.path.join(client_dir, project_id)
+    project_dir = client_dir / project_id
+    project_dir.mkdir()
 
-    ensure_dir(project_dir)
+    # ---- TEMPLATE COPY ----
+    if project_type == "PK":
+        if not PEEK_TEMPLATE_DIR.exists():
+            raise RuntimeError("PEEK template folder missing")
+        shutil.copytree(
+            PEEK_TEMPLATE_DIR,
+            project_dir,
+            dirs_exist_ok=True
+        )
+    # ---- RENAME PEEK BLEND TEMPLATE ----
+    if project_type == "PK":
+        old_blend = project_dir / "Blender" / "PEEK.blend"
+        new_blend = project_dir / "Blender" / f"{project_id}.blend"
 
-    # minimal project json
+        if old_blend.exists() and not new_blend.exists():
+            old_blend.rename(new_blend)
+
+    # ---- CASE METADATA ----
     save_json(
-        os.path.join(project_dir, f"{project_id}.json"),
+        project_dir / f"{project_id}.json",
         {
             "id": project_id,
             "client_id": client_id,
@@ -169,16 +180,6 @@ def new_project():
             "created_at": now_iso(),
         },
     )
-
-    # derive doctor name from client json
-    doctor_name = client.get("name", "")
-
-    # --------------------------------------------------
-    # INIT PEEK CASE (PK ONLY)
-    # --------------------------------------------------
-
-    if project_type == "PK":
-        init_peek_case(project_dir, project_id, doctor_name)
 
     print(f"\nProject created: {project_id}")
     project_menu(client_id, project_id, project_dir)
@@ -193,13 +194,13 @@ def open_project():
     if not client_id:
         return
 
-    client_dir = os.path.join(CLIENTS_DIR, client_id)
+    client_dir = Path(CLIENTS_DIR) / client_id
     projects = list_dirs(client_dir)
     project_id = select_from_list(projects, "Select project")
     if not project_id:
         return
 
-    project_dir = os.path.join(client_dir, project_id)
+    project_dir = client_dir / project_id
     project_menu(client_id, project_id, project_dir)
 
 # --------------------------------------------------
