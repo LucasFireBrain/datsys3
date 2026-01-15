@@ -1,4 +1,5 @@
 import subprocess
+from utils import update_stage
 from pathlib import Path
 
 # --------------------------------------------------
@@ -38,4 +39,5 @@ def launch_blender(project_path: str, project_id: str):
     ]
 
     subprocess.Popen(cmd)  # non-blocking
+    update_stage(project_dir, "Design")
     print("[OK] Blender launched")

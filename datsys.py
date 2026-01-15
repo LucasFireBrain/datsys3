@@ -1,6 +1,8 @@
 import os
 import shutil
 from pathlib import Path
+from timeline import show_timeline
+
 
 from dicom_ingestion import ingest_dicom
 from utils import (
@@ -11,6 +13,7 @@ from utils import (
     save_json,
     now_iso,
     date_code_base36,
+    update_stage,
 )
 
 # --------------------------------------------------
@@ -181,6 +184,8 @@ def new_project():
         },
     )
 
+    update_stage(project_dir, "NEW")
+
     print(f"\nProject created: {project_id}")
     project_menu(client_id, project_id, project_dir)
 
@@ -212,16 +217,26 @@ def main():
 
     while True:
         print("\n=== DATSYS ===")
+        print("[0] View Timeline")
         print("[1] New project")
         print("[2] Open project")
         print("[3] Exit")
 
         choice = prompt("> ")
 
-        if choice == "1":
+        if choice == "0":
+            project_id = show_timeline()
+            if project_id:
+                client_id = project_id.split("-")[1]
+                project_dir = Path(CLIENTS_DIR) / client_id / project_id
+                project_menu(client_id, project_id, project_dir)
+
+        elif choice == "1":
             new_project()
+
         elif choice == "2":
             open_project()
+
         elif choice == "3":
             break
 

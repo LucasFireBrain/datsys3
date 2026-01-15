@@ -1,5 +1,6 @@
 import os
 import json
+from pathlib import Path
 from datetime import datetime
 
 # -------------------------
@@ -71,3 +72,25 @@ def date_code_base36(dt=None):
     d = f"{dt.day:02d}"         # always 2 digits
 
     return f"{y}{m}{d}"
+
+def update_stage(project_dir, stage, message=None):
+    project_dir = Path(project_dir)
+
+    # ---- update peekCase.json ----
+    peek_path = project_dir / "peekCase.json"
+    data = load_json(peek_path, {})
+    data["estado_caso"] = stage
+    data["actualizado_en"] = now_iso()
+    save_json(peek_path, data)
+
+    # ---- append log ----
+    log_path = project_dir / "Log.txt"
+    log_path.touch(exist_ok=True)
+
+    timestamp = now_iso()[:16].replace("T", " ")
+    line = f"[{timestamp}] STAGE → {stage}"
+    if message:
+        line += f" | {message}"
+
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
