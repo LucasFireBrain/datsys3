@@ -155,19 +155,24 @@ def resolve_project_id(selector, rows):
 
     return None
 
+COMMANDS = [
+    "new",
+    "help",
+    "quit",
+    "<case>, stage, <value>",
+    "<case>, log, <message>",
+    "<case>, open",
+    "<case>, logopen",
+    "<case>, edit",
+    "<case>, dicom",
+    "<case>, slicer",
+    "<case>, blender",
+]
+
 def print_help():
     print("\nCommands:")
-    print("  new")
-    print("  help")
-    print("  quit")
-    print("  <case>, stage, <value>")
-    print("  <case>, log, <message>")
-    print("  <case>, open")
-    print("  <case>, logopen")
-    print("  <case>, edit")
-    print("  <case>, dicom")
-    print("  <case>, slicer")
-    print("  <case>, blender")
+    print(" | ".join(COMMANDS))
+
 
 def prompt_new_project():
     client_id = input("Client ID: ").strip().upper()
