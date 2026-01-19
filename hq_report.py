@@ -10,10 +10,7 @@ HQ_HEADERS = [
     "Nombre del Doctor",
     "Hospital",
     "Nombre del Paciente",
-    "Contacto",
-    "Fecha Ingreso",
     "Fecha Entrega",
-    "DC",
     "Fecha Cirugía",
     "Descripcion",
     "Precio Implante (IVA Incluido)",
@@ -31,7 +28,6 @@ def safe(v):
     return "" if v is None else str(v)
 
 def title_case_name(s: str) -> str:
-    # Simple, predictable title case (export-only)
     return " ".join(w.capitalize() for w in s.split())
 
 def normalize_dicom_name(raw: str) -> str:
@@ -39,20 +35,17 @@ def normalize_dicom_name(raw: str) -> str:
     Convert DICOM PN:
       'PEREZ LOPEZ^JUAN'
     -> 'Juan Perez Lopez'
-
-    Applied ONLY at export time.
+    Export-only normalization.
     """
     if not raw:
         return ""
 
     parts = str(raw).replace(",", "").split("^")
-
     if len(parts) == 1:
         return title_case_name(parts[0].strip())
 
     last = title_case_name(parts[0].strip())
     first = title_case_name(parts[1].strip())
-
     return f"{first} {last}"
 
 def compute_neto(precio_final, iva_incluido=True):
@@ -63,6 +56,17 @@ def compute_neto(precio_final, iva_incluido=True):
     if iva_incluido:
         return int(round(p / IVA_FACTOR))
     return int(round(p))
+
+def build_descripcion(peek: dict) -> str:
+    """
+    Descripcion = '<Region> - <Complejidad>'
+    Example: 'Cigomático - C'
+    """
+    region = safe(peek.get("region_anatomica"))
+    cpx = safe(peek.get("complejidad"))
+    if region and cpx:
+        return f"{region} - {cpx}"
+    return region or cpx
 
 # --------------------------------------------------
 # EXPORT
@@ -94,7 +98,7 @@ def export_hq_tsv(out_path: Path):
 
             peek = load_json(peek_path, {})
 
-            # ---- Patient name (normalize ONLY for export) ----
+            # ---- Patient name (export-only normalization) ----
             raw_patient = (
                 peek.get("nombre_paciente_dicom")
                 or peek.get("nombre_paciente")
@@ -110,12 +114,9 @@ def export_hq_tsv(out_path: Path):
                 title_case_name(safe(peek.get("nombre_doctor"))),
                 safe(peek.get("hospital_clinica")),
                 patient_name,
-                safe(client.get("contact")),
-                safe(peek.get("creado_en")),
                 safe(peek.get("fecha_entrega_estimada")),
-                safe(peek.get("complejidad")),
                 safe(peek.get("fecha_cirugia")),
-                safe(peek.get("requerimiento")),
+                build_descripcion(peek),
                 safe(precio_final),
                 safe(compute_neto(precio_final, iva_incluido)),
             ]
