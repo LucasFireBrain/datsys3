@@ -1,8 +1,10 @@
 from pathlib import Path
 from datetime import datetime, date, timedelta
+
+from peek import init_peek_case
 from utils import CLIENTS_DIR, load_json
+from hq_report import export_hq_tsv_default
 from datsys import (
-    import_segmentations,
     init_clients_dir,
     new_project,
     open_project_folder,
@@ -11,13 +13,15 @@ from datsys import (
     ingest_project_dicom,
     open_slicer,
     open_blender,
-    import_segmentations,   
+    import_segmentations,
     append_log,
+    print_peek_case,
 )
 
 # --------------------------------------------------
 # HELPERS
 # --------------------------------------------------
+
 def wait_for_enter():
     input("\n[Press ENTER to continue]")
 
@@ -29,11 +33,8 @@ def parse_date(s):
     except Exception:
         return None
 
-
 def business_days_left(deadline_date):
-    """
-    Count days until deadline, excluding Sundays.
-    """
+    """Count days until deadline, excluding Sundays."""
     if not deadline_date:
         return None
 
@@ -44,21 +45,20 @@ def business_days_left(deadline_date):
     days = 0
     d = today
     while d < deadline_date:
-        if d.weekday() != 6:  # Sunday
+        if d.weekday() != 6:
             days += 1
         d += timedelta(days=1)
 
     return days
 
-
 # --------------------------------------------------
-# MAIN
+# DATA COLLECTION
 # --------------------------------------------------
 
 def collect_rows():
     rows = []
-
     clients_path = Path(CLIENTS_DIR)
+
     if not clients_path.exists():
         return rows
 
@@ -81,7 +81,6 @@ def collect_rows():
 
             rows.append({
                 "project_id": project_dir.name,
-                "request_date": peek.get("creado_en", "")[:10],
                 "deadline": peek.get("fecha_entrega_estimada", ""),
                 "days_left": dleft,
                 "surgery": peek.get("fecha_cirugia", ""),
@@ -90,19 +89,20 @@ def collect_rows():
                 "stage": peek.get("estado_caso", ""),
             })
 
-    # --------------------------------------------------
-    # SORT (UNCHANGED – this is your stable logic)
-    # --------------------------------------------------
+    # Stable sort: backlog → urgent last → id
     rows.sort(
         key=lambda r: (
-            r["days_left"] is not None,                 # backlog first (None)
-            -(r["days_left"] if r["days_left"] is not None else 0),  # urgent LAST
-            r["project_id"]
+            r["days_left"] is not None,
+            -(r["days_left"] if r["days_left"] is not None else 0),
+            r["project_id"],
         )
     )
 
-
     return rows
+
+# --------------------------------------------------
+# RENDER
+# --------------------------------------------------
 
 def render_timeline(rows):
     if not rows:
@@ -110,14 +110,10 @@ def render_timeline(rows):
         return
 
     total = len(rows)
-
-    # --------------------------------------------------
-    # PRINT TABLE (NO HEADER AT TOP)
-    # --------------------------------------------------
     print("\n==================== CASE TIMELINE ====================")
 
     for i, r in enumerate(rows):
-        idx = total - i   # bottom row = 1
+        idx = total - i
         print(
             f"{idx:<3} "
             f"{r['project_id']:<15} "
@@ -129,15 +125,16 @@ def render_timeline(rows):
             f"{r['stage']:<20}"
         )
 
-    # --------------------------------------------------
-    # HEADER AT BOTTOM (as requested)
-    # --------------------------------------------------
     print("-" * 110)
     print(
         f"{'#':<3} {'CaseID':<15} {'Deadline':<10} "
         f"{'ΔDays':<6} {'Surgery':<10} {'Region':<15} "
         f"{'Cpx':<4} {'Stage':<20}"
     )
+
+# --------------------------------------------------
+# COMMAND RESOLUTION
+# --------------------------------------------------
 
 def resolve_project_id(selector, rows):
     if not selector:
@@ -165,16 +162,25 @@ COMMANDS = [
     "<case>, log, <message>",
     "<case>, open",
     "<case>, logopen",
+    "<case>, peek",
+    "<case>, ingest",
     "<case>, edit",
     "<case>, dicom",
     "<case>, slicer",
     "<case>, blender",
+    "<case>, import",
+    "<case>, importbg",
+    "hq, export",
 ]
+
 
 def print_help():
     print("\nCommands:")
     print(" | ".join(COMMANDS))
 
+# --------------------------------------------------
+# COMMAND HANDLER
+# --------------------------------------------------
 
 def prompt_new_project():
     client_id = input("Client ID: ").strip().upper()
@@ -189,6 +195,7 @@ def prompt_new_project():
     print("[1] PK - PEEK")
     print("[2] PL - PLA")
     print("[3] AR - Archive")
+
     t = input("> ").strip()
     type_map = {"1": "PK", "2": "PL", "3": "AR"}
     if t not in type_map:
@@ -213,8 +220,9 @@ def handle_command(command, rows):
         result = prompt_new_project()
         if not result:
             return True
+
         client_id, project_type, name, contact = result
-        project_id, _project_dir = new_project(
+        project_id, _ = new_project(
             client_id=client_id,
             project_type=project_type,
             name=name,
@@ -223,13 +231,17 @@ def handle_command(command, rows):
         print(f"[OK] Project created: {project_id}")
         return True
 
+    if command.lower().replace(" ", "") == "hq,export":
+        export_hq_tsv_default()
+        wait_for_enter()
+        return True   
+
     parts = [p.strip() for p in command.split(",")]
     if len(parts) < 2:
         print("Invalid command. Type 'help'.")
         return True
 
-    selector = parts[0]
-    action = parts[1].lower()
+    selector, action = parts[0], parts[1].lower()
     args = parts[2:]
 
     project_id = resolve_project_id(selector, rows)
@@ -240,23 +252,18 @@ def handle_command(command, rows):
     client_id = project_id.split("-")[1]
     project_dir = Path(CLIENTS_DIR) / client_id / project_id
 
+
     if action == "stage":
         if not args:
             print("Missing stage value.")
             return True
-        value = args[0]
-        message = ", ".join(args[1:]).strip() if len(args) > 1 else None
         from utils import update_stage
-        update_stage(project_dir, value, message=message)
-        print(f"[OK] Stage updated: {project_id} → {value}")
+        update_stage(project_dir, args[0], message=", ".join(args[1:]) if len(args) > 1 else None)
+        print(f"[OK] Stage updated: {project_id}")
         return True
 
     if action == "log":
-        if not args:
-            print("Missing log message.")
-            return True
-        message = ", ".join(args)
-        append_log(project_dir, message)
+        append_log(project_dir, ", ".join(args))
         print("[OK] Log appended.")
         return True
 
@@ -292,10 +299,22 @@ def handle_command(command, rows):
         import_segmentations(project_dir, project_id, headless=True)
         return True
 
+    if action == "peek":
+        print_peek_case(project_dir)
+        wait_for_enter()
+        return True
 
+    if action == "ingest":
+        init_peek_case(project_dir)
+        print("[OK] peekCase.json updated")
+        return True
 
     print("Unknown action. Type 'help'.")
     return True
+
+# --------------------------------------------------
+# MAIN LOOP
+# --------------------------------------------------
 
 def run_timeline_shell():
     init_clients_dir()
@@ -308,4 +327,3 @@ def run_timeline_shell():
 
 if __name__ == "__main__":
     run_timeline_shell()
-

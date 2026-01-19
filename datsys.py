@@ -131,3 +131,29 @@ def append_log(project_path: str, message: str):
     timestamp = now_iso()[:16].replace("T", " ")
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(f"[{timestamp}] {message}\n")
+
+
+# --------------------------------------------------
+# PEEK JSON PRINT
+# --------------------------------------------------
+def print_peek_case(project_path: str):
+    project_dir = Path(project_path)
+    peek_path = project_dir / "peekCase.json"
+
+    if not peek_path.exists():
+        print("[ERR] peekCase.json not found")
+        return
+
+    data = load_json(peek_path, {})
+
+    items = list(data.items())
+    cols = 3
+    col_width = 30
+
+    for i in range(0, len(items), cols):
+        row = items[i:i+cols]
+        line = ""
+        for k, v in row:
+            val = "" if v is None else str(v)
+            line += f"{k:<16}: {val:<{col_width}}"
+        print(line)

@@ -1,0 +1,15 @@
+ID del Caso	Nombre del Doctor	Hospital	Nombre del Paciente	Contacto	Fecha Ingreso	Fecha Entrega	DC	Fecha Cirugía	Descripcion	Precio Implante (IVA Incluido)	Neto
+Q114-CVE-PK1	Cristian Venables									0	0
+Q113-DAL-PK1	Diego Alcocer		Luis Nunez Bossay		2026-01-13T09:10:22					0	0
+Q113-DVE-PK1	David Veizaga	Bolivia	Maria Luisa Sanchez Fukushima		2026-01-13T08:12:49	2026-01-22	A	2026-01-24		630000	529412
+PB26-FVI-PK1	Fernanda Villalobos	Alemana	Javyera Cabrera Padilla		2026-01-02T16:35:10.661168	2026-01-27		TBC-00-00		0	0
+Q114-LPZ-PK3	Luis Perez	Hospital Parroquial de San Bernardo	Felipe Becerra Vargas			2026-01-20	C	2026-01-21	bilateral	680000	571429
+PC23-MLZ-PK1	Marcelo López	Clínica Dávila	Fabian Alexander Vega Guerra			2026-01-19	D	tbc-00-00	Simetrización unilateral de angulo y malar	960000	806723
+Q113-PAR-PK1	Pablo Romero	Hospital Parroquial de San Bernardo	Edna Belmar San Martin		2026-01-14T13:40:35	2026-01-16	C	2026-01-19	Poco volumen, bilateral	680000	571429
+PB14-PSO-PK1	Pedro Solé				2026-01-02T16:35:10.665348					0	0
+PB30-PSO-PK2	Pedro Solé		Graciela Candia Palma		2026-01-02T16:35:10.665348					0	0
+PC03-PSO-PK3	Pedro Solé		Sofia Contreras Carmona		2026-01-02T16:20:48.709627					0	0
+Q108-PSO-PK4	Pedro Solé		Pablo Contreras Contreras							0	0
+Q108-RCA-PK1	Rolando Carrasco	Clínica Indisa	Diego Garcia Ulloa			2026-01-23		2026-01-26		0	0
+Q115-RCA-PK2	Rolando Carrasco									0	0
+Q113-RGU-PK1	Renato Gunkel		Nicole Palma Jorquera		2026-01-13T10:28:53					0	0
