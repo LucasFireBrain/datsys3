@@ -1,7 +1,7 @@
 # =========================
 # DatSys3 – Git Ignore
 # =========================
-
+prompt
 # --- Runtime / user data (SOURCE OF TRUTH, NEVER COMMIT) ---
 clients/**
 !clients/.gitkeep
