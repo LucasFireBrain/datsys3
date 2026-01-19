@@ -2,6 +2,7 @@ from pathlib import Path
 from datetime import datetime, date, timedelta
 from utils import CLIENTS_DIR, load_json
 from datsys import (
+    import_segmentations,
     init_clients_dir,
     new_project,
     open_project_folder,
@@ -10,6 +11,7 @@ from datsys import (
     ingest_project_dicom,
     open_slicer,
     open_blender,
+    import_segmentations,   
     append_log,
 )
 
@@ -281,6 +283,16 @@ def handle_command(command, rows):
     if action == "blender":
         open_blender(project_dir, project_id)
         return True
+
+    if action == "import":
+        import_segmentations(project_dir, project_id)
+        return True
+
+    if action == "importbg":
+        import_segmentations(project_dir, project_id, headless=True)
+        return True
+
+
 
     print("Unknown action. Type 'help'.")
     return True

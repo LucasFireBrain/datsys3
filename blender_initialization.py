@@ -1,6 +1,8 @@
 import bpy
 from pathlib import Path
 
+from utils import update_stage
+
 # --------------------------------------------------
 # CONFIG
 # --------------------------------------------------
@@ -84,6 +86,8 @@ def main():
         else:
             print(f"[BLENDER] Unmatched → {obj.name}")
 
+    bpy.ops.wm.save_mainfile()
+    update_stage(project_root, "Segmentations")
     print("[BLENDER] Initialization complete")
 
 # --------------------------------------------------

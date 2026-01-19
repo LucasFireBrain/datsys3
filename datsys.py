@@ -115,9 +115,15 @@ def open_slicer(project_path: str):
     dicom_dir = Path(project_path) / "DICOM"
     launch_slicer_with_dicom(dicom_dir)
 
-def open_blender(project_path: str, project_id: str):
-    from blender_launcher import launch_blender
-    launch_blender(project_path, project_id)
+def open_blender(project_path, project_id):
+    from blender_launcher import launch_blender_open
+    launch_blender_open(project_path, project_id)
+
+def import_segmentations(project_path, project_id, headless=False):
+    from blender_launcher import launch_blender_import
+    launch_blender_import(project_path, project_id, headless=headless)
+
+
 
 def append_log(project_path: str, message: str):
     log_path = Path(project_path) / "Log.txt"

@@ -18,7 +18,8 @@ SCRIPTS = [
     "quickBoolean.py",
     "idBridge.py",
     "islands.py",
-    "minThickness"
+    "minThickness",
+    "matchTransforms"
 ]
 
 # --------------------------------------------------

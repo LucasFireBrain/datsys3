@@ -16,6 +16,28 @@ SCRIPT_NAME = "blender_initialization.py"
 # --------------------------------------------------
 # LAUNCHER
 # --------------------------------------------------
+def launch_blender_open(project_path: str, project_id: str):
+    blend_file = Path(project_path) / "Blender" / f"{project_id}.blend"
+    subprocess.Popen([str(BLENDER_EXE), str(blend_file)])
+    update_stage(project_root, "Design")
+
+def launch_blender_import(project_path: str, project_id: str, headless=False):
+    blend_file = Path(project_path) / "Blender" / f"{project_id}.blend"
+    script_file = Path(__file__).parent / "blender_initialization.py"
+
+    cmd = [
+        str(BLENDER_EXE),
+        str(blend_file),
+        "--python",
+        str(script_file),
+    ]
+
+    if headless:
+        cmd.insert(1, "--background")
+
+    subprocess.Popen(cmd)
+    
+
 
 def launch_blender(project_path: str, project_id: str):
     project_dir = Path(project_path)
@@ -39,5 +61,4 @@ def launch_blender(project_path: str, project_id: str):
     ]
 
     subprocess.Popen(cmd)  # non-blocking
-    update_stage(project_dir, "Design")
     print("[OK] Blender launched")
